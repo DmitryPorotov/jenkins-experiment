@@ -4,6 +4,7 @@
 // official Jenkins Helm chart) and the RBAC in k8s/jenkins-rbac.yaml applied.
 
 def REGISTRY   = "registry.registry.svc.cluster.local:5000"
+def REGISTRY_EXTERN = "localhost:30500"
 def IMAGE_NAME = "myapp"
 def APP_NS     = "default"
 
@@ -85,7 +86,7 @@ spec:
                 container('kubectl') {
                     sh """
                         kubectl set image deployment/${IMAGE_NAME} \
-                          ${IMAGE_NAME}=${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} \
+                          ${IMAGE_NAME}=${REGISTRY_EXTERN}/${IMAGE_NAME}:${IMAGE_TAG} \
                           -n ${APP_NS} --record
 
                         kubectl rollout status deployment/${IMAGE_NAME} -n ${APP_NS} --timeout=120s
