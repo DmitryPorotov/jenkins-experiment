@@ -85,7 +85,7 @@ spec:
                 container('kubectl') {
                     sh """
                         kubectl set image deployment/${IMAGE_NAME} \
-                          ${IMAGE_NAME}=${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} \
+                          ${IMAGE_NAME}=http://${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} \
                           -n ${APP_NS} --record
 
                         kubectl rollout status deployment/${IMAGE_NAME} -n ${APP_NS} --timeout=120s
