@@ -83,16 +83,17 @@ spec:
 
         stage('Deploy to Kubernetes') {
             steps {
-                container('kubectl') {
-                    echo "Image tag ${IMAGE_TAG}\n"
-                    
-                    sh """
-                        kubectl set image deployment/${IMAGE_NAME} \
-                          ${IMAGE_NAME}=${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} \
-                          -n ${APP_NS}
+                retry(2) {
+                    container('kubectl') {
+                        echo "Image tag ${IMAGE_TAG}\n"
+                        sh """
+                            kubectl set image deployment/${IMAGE_NAME} \
+                            ${IMAGE_NAME}=${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} \
+                            -n ${APP_NS}
 
-                        kubectl rollout status deployment/${IMAGE_NAME} -n ${APP_NS} --timeout=300s
-                    """
+                            kubectl rollout status deployment/${IMAGE_NAME} -n ${APP_NS} --timeout=300s
+                        """
+                    }
                 }
             }
         }
