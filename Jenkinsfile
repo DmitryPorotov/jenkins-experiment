@@ -84,9 +84,9 @@ spec:
         stage('Deploy to Kubernetes') {
             steps {
                 container('kubectl') {
+                    echo "Image tag ${IMAGE_TAG}\n"
+                    
                     sh """
-                        #kubectl config current-context
-                        #kubectl auth can-i update deployment/${IMAGE_NAME} -n ${APP_NS}
                         kubectl set image deployment/${IMAGE_NAME} \
                           ${IMAGE_NAME}=${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} \
                           -n ${APP_NS}
