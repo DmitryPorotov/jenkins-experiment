@@ -94,7 +94,7 @@ spec:
                             ${IMAGE_NAME}=${REGISTRY_EXTERN}/${IMAGE_NAME}:${IMAGE_TAG} \
                             -n ${APP_NS}
 
-                            # kubectl rollout status deployment/${IMAGE_NAME} -n ${APP_NS} --timeout=300s
+                            kubectl rollout status deployment/${IMAGE_NAME} -n ${APP_NS} --timeout=120s
                         """
                     }
                 }
