@@ -25,6 +25,8 @@ spec:
       image: bitnami/kubectl:latest
       command: ["cat"]
       tty: true
+      securityContext:
+        runAsUser: 1000
 """
         }
     }
@@ -39,72 +41,67 @@ spec:
         IMAGE_TAG = "${env.GIT_COMMIT.take(7)}"
     }
 
-    podTemplate (
-        containers: [
-            containerTemplate(name: 'kubectl', image: 'bitnami/kubectl:latest', command: 'sleep', args: 'infinity')
-        ],
-        securityContext: podSecurityContext(fsGroup: 1000)
-    ) { 
-        stages {
 
-            stage('Checkout') {
-                steps {
-                    checkout scm
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        // --- Optional: language-specific build/test step -------------------
+        // Since the project mixes languages/build tools, the actual
+        // compile/test step is expected to happen either:
+        //   (a) inside the Dockerfile itself (recommended, multi-stage build), or
+        //   (b) here, in an extra container in the pod spec above
+        //       (e.g. add a "maven" or "node" container and `sh` into it).
+        // Leaving this stage as a placeholder / hook.
+        stage('Build & Test (pre-Docker)') {
+            steps {
+                echo 'Add language-specific build/test commands here if not handled inside the Dockerfile.'
+            }
+        }
+
+        stage('Build & Push Image (Kaniko)') {
+            steps {
+                container('kaniko') {
+                    sh """
+                        /kaniko/executor \
+                        --context=`pwd` \
+                        --dockerfile=`pwd`/Dockerfile \
+                        --destination=${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} \
+                        --destination=${REGISTRY}/${IMAGE_NAME}:latest \
+                        --insecure \
+                        --insecure-pull \
+                        --skip-tls-verify
+                    """
+                    // --insecure/--skip-tls-verify are needed only because the
+                    // in-cluster registry from k8s/registry-deployment.yaml
+                    // serves plain HTTP. Remove these flags once you put TLS
+                    // in front of the registry.
                 }
             }
+        }
 
-            // --- Optional: language-specific build/test step -------------------
-            // Since the project mixes languages/build tools, the actual
-            // compile/test step is expected to happen either:
-            //   (a) inside the Dockerfile itself (recommended, multi-stage build), or
-            //   (b) here, in an extra container in the pod spec above
-            //       (e.g. add a "maven" or "node" container and `sh` into it).
-            // Leaving this stage as a placeholder / hook.
-            stage('Build & Test (pre-Docker)') {
-                steps {
-                    echo 'Add language-specific build/test commands here if not handled inside the Dockerfile.'
-                }
-            }
-
-            stage('Build & Push Image (Kaniko)') {
-                steps {
-                    container('kaniko') {
+        stage('Deploy to Kubernetes') {
+            steps {
+                retry(2) {
+                    container('kubectl') {
+                        echo "Image tag ${IMAGE_TAG}\n"
                         sh """
-                            /kaniko/executor \
-                            --context=`pwd` \
-                            --dockerfile=`pwd`/Dockerfile \
-                            --destination=${REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG} \
-                            --destination=${REGISTRY}/${IMAGE_NAME}:latest \
-                            --insecure \
-                            --insecure-pull \
-                            --skip-tls-verify
+                            kubectl set image deployment/${IMAGE_NAME} \
+                            ${IMAGE_NAME}=${REGISTRY_EXTERN}/${IMAGE_NAME}:${IMAGE_TAG} \
+                            -n ${APP_NS}
+
+                            # kubectl rollout status deployment/${IMAGE_NAME} -n ${APP_NS} --timeout=300s
                         """
-                        // --insecure/--skip-tls-verify are needed only because the
-                        // in-cluster registry from k8s/registry-deployment.yaml
-                        // serves plain HTTP. Remove these flags once you put TLS
-                        // in front of the registry.
-                    }
-                }
-            }
-
-            stage('Deploy to Kubernetes') {
-                steps {
-                    retry(2) {
-                        container('kubectl') {
-                            echo "Image tag ${IMAGE_TAG}\n"
-                            sh """
-                                kubectl set image deployment/${IMAGE_NAME} \
-                                ${IMAGE_NAME}=${REGISTRY_EXTERN}/${IMAGE_NAME}:${IMAGE_TAG} \
-                                -n ${APP_NS}
-
-                                # kubectl rollout status deployment/${IMAGE_NAME} -n ${APP_NS} --timeout=300s
-                            """
-                        }
                     }
                 }
             }
         }
     }
+    
 
     post {
         failure {
